@@ -4,11 +4,12 @@
 # by Roberto S. Galende
 # port of linux' bytes-circle to R
 # v1.0, Nov 2016
+# v1.1, Dec 2016
 #
 # licensed under GPL-3
 #
 
-#' bytescircle
+#'  Statistics About Bytes Contained in a File as a Circle Plot
 #'
 #'  bytescircle is a function that shows statistics about bytes contained in a file 
 #'  as a circle graph of deviations from mean in sigma increments. 
@@ -88,6 +89,9 @@
 #'    and analysing the file again. The input can also be a bare 256 element vector:
 #'    in this case each element represents the appeareances in the file of that 
 #'    [n-1] byte value.
+#' @param restrict boolean, if TRUE statistics will use only the number of byte values
+#'    (buckets) that appear in the file, and not the 256 default value. This makes
+#'    a difference only if there're byte values that do not appear in the file.
 #'
 #' @return factor of values :
 #' 
@@ -99,13 +103,13 @@
 #' 
 #'    $mean: mean value  
 #' 
-#'    $sd: sigma (true sd) value  
+#'    $sd: sigma (true sd) value: sigma=sd()*sqrt((n-1)/n)  
 #' 
 #'    $cv: coefficient of variation (mean/sigma*100)  
 #' 
 #'    $circle: complex matrix representing an ascii circle: each element is the 
 #'        deviation from sigma of the represented byte. Elements which do not 
-#'        represent bytes get the value '0+1i'.  
+#'        represent bytes get the value '0+1i'. See bytescircle's User Manual (R vignette).
 #' 
 #' @examples
 #'  bytescircle( system.file("extdata", "gplv3.txt", package="bytescircle"), 
@@ -114,19 +118,26 @@
 #'  # which bytes in this file have a sd greater than 2*sigma?
 #'  BYTES=bytescircle( system.file("extdata", "gplv3.txt.gz", package="bytescircle"), plot=3, 
 #'    col=c("gold","blueviolet")); 
-#'    which(BYTES$deviation>2.0)-1 # -1, 'cause BYTES[1] corresponds to byte 0 
+#'  which(BYTES$deviation>2.0)-1 # -1, 'cause BYTES[1] corresponds to byte 0 
 #'
 #'  # use a vector as input:
 #'  BYTES=c(256:1); bytescircle(input=BYTES,output=0)
 #' 
 #' @author Roberto S. Galende <roberto.s.galende at gmail.com>
 #'
+#' @seealso
+#'   bytescircle's User Manual (R vignette)
+#'
+#'   Origin of bytes-circle linux command: \url{https://circulosmeos.wordpress.com/2015/10/10/statistics-circle-for-analysing-byte-entropy-in-files/}
+#'
+#'   Source code repository: \url{https://github.com/circulosmeos/bytescircle}
+#'
 #' @importFrom graphics abline axis boxplot legend par plot points text title
 #' @importFrom stats IQR quantile sd
 #' @importFrom utils capture.output 
 #'
 #' @export
-bytescircle = function ( FILE = "", ascii = FALSE, plot = 1, col = c(), output = 1, input = NULL ) {
+bytescircle = function ( FILE = "", ascii = FALSE, plot = 1, col = c(), output = 1, input = NULL, restrict = FALSE ) {
 
   token = bytescircle.token() 
 
@@ -180,7 +191,7 @@ bytescircle = function ( FILE = "", ascii = FALSE, plot = 1, col = c(), output =
     }
 
     # check file existence/readability
-    if (file.access(FILE, mode = 4) != 0) {
+    if (file.access(FILE, mode = 0) != 0) {
       stop( 
         capture.output( 
           cat("file '", FILE, "' is not readable. Process aborted.") )
@@ -218,16 +229,31 @@ bytescircle = function ( FILE = "", ascii = FALSE, plot = 1, col = c(), output =
   }
 
   # counts and more counts on bytes
-  #MEAN=SIZE/(token$MAX_VALUE)
-  MEAN=mean(BYTE)
-  # We want the Uncorrected sample standard deviation, not Corrected sample standard deviation
-  # see https://en.wikipedia.org/wiki/Standard_deviation#Uncorrected_sample_standard_deviation
-  #SIGMA=sqrt(sum((BYTE-MEAN)^2)/(token$MAX_VALUE)) # Uncorrected sample standard deviation
-  # R calculates Corrected sample standard deviation, so correct it:
-  SIGMA=sd(BYTE)*sqrt((token$MAX_VALUE-1)/token$MAX_VALUE)
-  
-  BYTES = list(bytes=BYTE,
+  if (restrict==FALSE) {
+    #MEAN=SIZE/(token$MAX_VALUE)
+    MEAN=mean(BYTE)
+    # We want the Uncorrected sample standard deviation, not Corrected sample standard deviation
+    # see https://en.wikipedia.org/wiki/Standard_deviation#Uncorrected_sample_standard_deviation
+    #SIGMA=sqrt(sum((BYTE-MEAN)^2)/(token$MAX_VALUE)) # Uncorrected sample standard deviation
+    # R calculates Corrected sample standard deviation, so correct it:
+    SIGMA=sd(BYTE)*sqrt((token$MAX_VALUE-1)/token$MAX_VALUE)
+
+  } else {
+    if (length(BYTE[BYTE>0])>0) {
+      MEAN=mean(BYTE[BYTE>0])
+      SIGMA=sd(BYTE[BYTE>0])*sqrt((length(BYTE[BYTE>0])-1)/length(BYTE[BYTE>0]))
+    } else {
+      MEAN=0
+      SIGMA=0
+    }
+  }
+
+  if (SIGMA>0)
+    BYTES = list(bytes=BYTE,
                deviation=(BYTE-MEAN)/SIGMA*4 )
+  else 
+    BYTES = list(bytes=BYTE,
+               deviation=rep(0,token$MAX_VALUE) )
   
   t = which(abs(BYTES$deviation)>=(token$MAX_SIGMA_CHAR) & BYTES$bytes!=0)
   BYTES$deviation[ t[which(BYTES$deviation[t]>0)] ] = +token$MAX_SIGMA_CHAR
@@ -327,10 +353,20 @@ bytescircle = function ( FILE = "", ascii = FALSE, plot = 1, col = c(), output =
     FILE = gsub( "\\\\", "/" , FILE)
   }
 
+  if (MEAN>0)
+    CV=SIGMA/MEAN*100
+  else
+    CV=0
+
   if (output != 0 | ascii == TRUE) {
     cat("file = ", FILE, "\n")
-    cat("mean = ", round(MEAN, 3), "\n")
-    cat("sigma= ", round(SIGMA, 3), "( CV= ", round(SIGMA/MEAN*100,4), "% )", "\n")
+    if (restrict == FALSE) {
+      cat("mean = ", round(MEAN, 3), "\n")
+    } else {
+      cat("mean = ", round(MEAN, 3), 
+        "(", length(BYTES$bytes[BYTES$bytes>0]), "/", token$MAX_VALUE, "byte buckets)\n")
+    }
+    cat("sigma= ", round(SIGMA, 3), "( CV= ", round(CV,4), "% )", "\n")
 
     readable_size = SIZE
     i=1
@@ -347,9 +383,19 @@ bytescircle = function ( FILE = "", ascii = FALSE, plot = 1, col = c(), output =
   # return zusammengetragen data
   BYTES$file=FILE
   BYTES$mean=MEAN
-  BYTES$deviation=(BYTE-MEAN)/SIGMA
+  if (SIGMA>0) {
+    BYTES$deviation=(BYTE-MEAN)/SIGMA
+  } else {
+    BYTES$deviation=rep(0,token$MAX_VALUE)
+  }
   BYTES$sd=SIGMA
-  BYTES$cv=SIGMA/MEAN*100
+  BYTES$cv=CV
+  if (restrict == TRUE) {
+    explanation = capture.output(cat("calculated using", length(BYTES$bytes[BYTES$bytes>0]), "byte buckets"))
+    attr(BYTES$mean,"note")=explanation
+    attr(BYTES$sd,  "note")=explanation
+    attr(BYTES$cv,  "note")=explanation
+  }
   attr(BYTES$cv,"description")="percentage value"
   BYTES$circle=circle
   
@@ -403,7 +449,7 @@ bytescircle.token = function () {
 
 # returns a matrix of deviations appropriate for print.circle()
 create.statistics.circle = function ( BYTES, token ) {
-    
+
   coordinates = c(rep(0,token$MAX_VALUE))
 
   angle=0.0

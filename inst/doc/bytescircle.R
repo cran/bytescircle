@@ -9,7 +9,7 @@ knitr::include_graphics("bytescircle_plot_2.png")
 ## ----eval=FALSE----------------------------------------------------------
 #  bytescircle( input=BYTES, plot=3 )
 
-## ---- out.width = "300px", echo=FALSE------------------------------------
+## ---- out.width = "250px", echo=FALSE------------------------------------
 knitr::include_graphics("bytescircle_plot_3.png")
 
 ## ----eval=FALSE----------------------------------------------------------

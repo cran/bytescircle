@@ -2,10 +2,10 @@
 % Please edit documentation in R/bytescircle.R
 \name{bytescircle}
 \alias{bytescircle}
-\title{bytescircle}
+\title{Statistics About Bytes Contained in a File as a Circle Plot}
 \usage{
 bytescircle(FILE = "", ascii = FALSE, plot = 1, col = c(), output = 1,
-  input = NULL)
+  input = NULL, restrict = FALSE)
 }
 \arguments{
 \item{FILE}{char array with the path to an existing file to analyse}
@@ -54,6 +54,10 @@ This can be useful for generating a new graph without the hassle of R reading
 and analysing the file again. The input can also be a bare 256 element vector:
 in this case each element represents the appeareances in the file of that 
 [n-1] byte value.}
+
+\item{restrict}{boolean, if TRUE statistics will use only the number of byte values
+(buckets) that appear in the file, and not the 256 default value. This makes
+a difference only if there're byte values that do not appear in the file.}
 }
 \value{
 factor of values :
@@ -66,13 +70,13 @@ factor of values :
 
    $mean: mean value  
 
-   $sd: sigma (true sd) value  
+   $sd: sigma (true sd) value: sigma=sd()*sqrt((n-1)/n)  
 
    $cv: coefficient of variation (mean/sigma*100)  
 
    $circle: complex matrix representing an ascii circle: each element is the 
        deviation from sigma of the represented byte. Elements which do not 
-       represent bytes get the value '0+1i'.
+       represent bytes get the value '0+1i'. See bytescircle's User Manual (R vignette).
 }
 \description{
 bytescircle is a function that shows statistics about bytes contained in a file 
@@ -119,7 +123,7 @@ bytescircle() can accept its own output as input using 'input=variable'.
  # which bytes in this file have a sd greater than 2*sigma?
  BYTES=bytescircle( system.file("extdata", "gplv3.txt.gz", package="bytescircle"), plot=3, 
    col=c("gold","blueviolet")); 
-   which(BYTES$deviation>2.0)-1 # -1, 'cause BYTES[1] corresponds to byte 0 
+ which(BYTES$deviation>2.0)-1 # -1, 'cause BYTES[1] corresponds to byte 0 
 
  # use a vector as input:
  BYTES=c(256:1); bytescircle(input=BYTES,output=0)
@@ -127,5 +131,12 @@ bytescircle() can accept its own output as input using 'input=variable'.
 }
 \author{
 Roberto S. Galende <roberto.s.galende at gmail.com>
+}
+\seealso{
+bytescircle's User Manual (R vignette)
+
+  Origin of bytes-circle linux command: \url{https://circulosmeos.wordpress.com/2015/10/10/statistics-circle-for-analysing-byte-entropy-in-files/}
+
+  Source code repository: \url{https://github.com/circulosmeos/bytescircle}
 }
 
